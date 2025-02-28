@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload and Preview</title>
+  <style>
+    /* Additional styles for modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgb(0, 0, 0);
+      background-color: rgba(0, 0, 0, 0.4);
+      padding-top: 60px;
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      margin: 5% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 700px;
+    }
+
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    /* Original styles */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    h1 {
+      text-align: center;
+      color: #444;
+      margin-top: 20px;
+    }
+
+    form {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+
+    table th, table td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ddd;
+    }
+
+    table th {
+      background-color: #f4f4f9;
+      color: #555;
+    }
+
+    table td {
+      background-color: #fafafa;
+    }
+
+    button {
+      padding: 10px 15px;
+      margin: 10px 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s ease;
+    }
+
+    button[type="submit"] {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    button[type="reset"] {
+      background-color: #f44336;
+      color: white;
+    }
+
+    button:hover {
+      background-color: #333;
+      color: #fff;
+    }
+
+    button:disabled {
+      background-color: #ddd;
+      color: #aaa;
+      cursor: not-allowed;
+    }
+
+    #fetchFilesBtn {
+      background-color: #007BFF;
+      color: white;
+    }
+
+    #fetchFilesBtn:hover {
+      background-color: #0056b3;
+    }
+
+    img {
+      max-width: 100px;
+      max-height: 100px;
+    }
+
+    p {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: #666;
+    }
+
+    #appNo {
+      font-weight: bold;
+      color: #000;
+    }
+
+    input[type="file"] {
+      padding: 5px;
+      background-color: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 90%;
+    }
+  </style>
+</head>
+<body>
+  <h1>Upload and Preview Files</h1>
+
+  <form id="file-upload-form">
+    <p>Application Number: <span id="appNo">Not generated yet</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>S.No</th>
+          <th>Document Type</th>
+          <th>Action</th>
+          <th>File Name</th>
+          <th>Preview</th>
+        </tr>
+      </thead>
+      <tbody id="fileTableBody">
+        <tr>
+          <td>1</td>
+          <td>Residence Proof</td>
+          <td><input type="file" id="file1" accept=".jpg,.jpeg,.pdf" required onchange="updateFileDetails('file1')"></td>
+          <td><span id="file1Name"></span></td>
+          <td><button type="button" id="viewFile1" style="display:none;" onclick="previewFile('file1')">Preview</button></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Photo ID Proof</td>
+          <td><input type="file" id="file2" accept=".jpg,.jpeg,.pdf" required onchange="updateFileDetails('file2')"></td>
+          <td><span id="file2Name"></span></td>
+          <td><button type="button" id="viewFile2" style="display:none;" onclick="previewFile('file2')">Preview</button></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <button type="submit">Upload</button>
+    <button type="reset" onclick="resetForm()">Reset</button>
+  </form>
+
+  <div id="fetchSection" style="text-align: center; margin-top: 20px; display: none;">
+    <button id="fetchFilesBtn">Fetch Files for Application</button>
+  </div>
+
+  <!-- Modal for file preview -->
+  <div id="previewModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closePreview()">&times;</span>
+      <img id="previewImage" src="" alt="Preview Image" style="width: 100%; height: auto;">
+      <iframe id="previewPdf" style="width: 100%; height: 500px; display: none;"></iframe>
+    </div>
+  </div>
+
+  <script>
+    let appNo = '';  // This will hold the dynamic application number
+
+    // Fetch Application Number from server on page load
+    const fetchAppNo = async () => {
+      try {
+        const response = await fetch('/files/generate-appno');
+        if (!response.ok) throw new Error('Failed to fetch application number');
+        const data = await response.json();
+        appNo = data.appNo;
+        document.getElementById('appNo').textContent = appNo;  // Display the dynamic application number
+      } catch (error) {
+        console.error('Error fetching application number:', error);
+      }
+    };
+
+    // Update file details (name and enable preview)
+    function updateFileDetails(fileId) {
+      const fileInput = document.getElementById(fileId);
+      const fileNameSpan = document.getElementById(fileId + 'Name');
+      const previewButton = document.getElementById('view' + fileId.charAt(0).toUpperCase() + fileId.slice(1));
+
+      if (fileInput.files.length > 0) {
+        fileNameSpan.textContent = fileInput.files[0].name;
+        previewButton.style.display = 'inline';
+      } else {
+        fileNameSpan.textContent = '';
+        previewButton.style.display = 'none';
+      }
+    }
+
+    // Show preview modal
+    function previewFile(fileId) {
+      const fileInput = document.getElementById(fileId);
+      const file = fileInput.files[0];
+      const modal = document.getElementById('previewModal');
+      const previewImage = document.getElementById('previewImage');
+      const previewPdf = document.getElementById('previewPdf');
+
+      if (file.type === 'application/pdf') {
+        previewImage.style.display = 'none';
+        previewPdf.style.display = 'block';
+        previewPdf.src = URL.createObjectURL(file);
+      } else {
+        previewPdf.style.display = 'none';
+        previewImage.style.display = 'block';
+        previewImage.src = URL.createObjectURL(file);
+      }
+
+      modal.style.display = 'block';
+    }
+
+    // Close preview modal
+    function closePreview() {
+      const modal = document.getElementById('previewModal');
+      modal.style.display = 'none';
+    }
+
+    // Upload Files
+    document.getElementById('file-upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const files = [];
+      const fileInputs = document.querySelectorAll('input[type="file"]');
+      for (const input of fileInputs) {
+        if (input.files.length > 0) {
+          const file = input.files[0];
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            files.push({
+              name: file.name,
+              base64: event.target.result.split(',')[1],
+              appNo: appNo  // Use the dynamically fetched appNo here
+            });
+
+            // Check if all files are processed
+            if (files.length === Array.from(fileInputs).reduce((sum, el) => sum + el.files.length, 0)) {
+              uploadFiles(files);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    });
+
+    const uploadFiles = async (files) => {
+      try {
+        const response = await fetch('/files/upload-base64', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files })
+        });
+
+        if (!response.ok) throw new Error('Failed to upload files');
+        const result = await response.json();
+        alert(`Files uploaded successfully! Application No: ${result.appNo}`);
+        document.getElementById('fetchSection').style.display = 'block'; // Show fetch button
+      } catch (error) {
+        console.error('Error uploading files:', error);
+        alert('Error uploading files');
+      }
+    };
+    document.getElementById('fetchFilesBtn').addEventListener('click', async () => {
+  if (!appNo) {
+    alert('Application number is not yet generated');
+    return;
+  }
+
+  try {
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    const files = Array.from(fileInputs).map(input => input.files[0]?.name).filter(Boolean);
+
+    const fileTableBody = document.getElementById('fileTableBody');
+    fileTableBody.innerHTML = '';  // Clear previous content
+
+    // Loop through the file names and fetch each file
+    for (let i = 0; i < files.length; i++) {
+      const encodedFileName = encodeURIComponent(files[i]);  // URL-encode the file name
+      const fetchUrl = `/files/applications/${appNo}?filename=${encodedFileName}`;  // Use the dynamically fetched appNo here
+
+      console.log('Fetching file from URL:', fetchUrl);  // Log the URL being called
+
+      const response = await fetch(fetchUrl);
+      console.log('Response:', response);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${files[i]}`);
+      }
+
+      // Handle the file as a blob (binary data)
+      const blob = await response.blob();
+
+      // Create a URL for the file
+      const fileUrl = URL.createObjectURL(blob);
+
+      // Create a new row in the table for the fetched file
+      const newRow = document.createElement('tr');
+      newRow.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${files[i]}</td>
+        <td><a href="${fileUrl}" download="${files[i]}">Download</a></td>
+        <td>${files[i]}</td>
+        <td><img src="${fileUrl}" alt="Preview" style="max-width: 100px; max-height: 100px;"></td>
+      `;
+      fileTableBody.appendChild(newRow);
+    }
+  } catch (error) {
+    console.error('Error fetching file:', error);
+    alert('Error fetching file: ' + error.message);
+  }
+});
+
+
+    // Initialize the application number on page load
+    fetchAppNo();
+  </script>
+</body>
+</html>
