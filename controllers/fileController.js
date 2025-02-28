@@ -1,10 +1,11 @@
+const { Console } = require('console');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const app = express();
 app.use(express.json());
 const uploadDir = 'D:/home/Images'; // Directory where files are stored
-
+Console.log("uploadDir"+uploadDir);
 // Endpoint to upload files
 exports.uploadFiles = async (req, res) => {
   const { files } = req.body;
